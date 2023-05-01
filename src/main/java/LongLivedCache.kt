@@ -1,3 +1,5 @@
+package kz.technodom.inbody.util
+
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,35 +23,36 @@ private var MAX_THREADS = 3
  *
  * All configuration should be made via [register]
  *
- * @param timeout in seconds, after that [invalidateAll] will be fired automatically
+ * @param timeoutInSeconds in seconds, after that [invalidateAll] will be fired automatically
  *
  * @author alex@justprodev.com
  */
 open class LongLivedCache(
-    timeout: Int,
+    timeoutInSeconds: Int,
     maxThreads: Int = 3,
     invalidatorDelay: Long = 1000L
 ) {
     private val agents = HashMap<String, CacheAgent<*>>()
-    private val log = LoggerFactory.getLogger(LongLivedCache::class.java)
+    private val log = LoggerFactory.getLogger(this::class.java)
 
     init {
         // "constants"
         INVALIDATOR_DELAY = invalidatorDelay
         MAX_THREADS = maxThreads
 
-        val ttl = TimeUnit.SECONDS.toMillis(timeout.toLong())
+        val ttl = TimeUnit.SECONDS.toMillis(timeoutInSeconds.toLong())
         timer("${this.javaClass.name}_invalidate", initialDelay = ttl, period = ttl) {
-            log.info("invalidate ${agents.size} agents by timeout ($timeout seconds)")
+            log.debug("invalidate ${agents.size} agents by timeout ($timeoutInSeconds seconds)")
             invalidateAll()
         }
-        log.info("init: threads = $MAX_THREADS, timeout = $ttl seconds, invalidator_delay= $INVALIDATOR_DELAY ms")
+        log.debug("init: threads = $MAX_THREADS, timeout = $ttl ms, invalidator_delay = $INVALIDATOR_DELAY ms")
     }
 
     /**
      * @param name should be registered with [register] before
-     * @param force update cached value and return
+     * @param forceUpdate update cached value and return
      */
+    @Suppress("UNCHECKED_CAST")
     @Throws(MethodNotRegisteredException::class)
     fun <R> get(name: String, forceUpdate: Boolean = false): R? {
         val agent = agents[name] ?: throw MethodNotRegisteredException("Method $name not registered")
@@ -58,7 +61,6 @@ open class LongLivedCache(
 
     /**
      * @param name should be registered with [register] before
-     * @param force delete cached value
      */
     @Throws(MethodNotRegisteredException::class)
     fun invalidate(name: String) {
@@ -76,7 +78,7 @@ open class LongLivedCache(
     @Throws(WrongOrderException::class)
     fun <R> register(
         name: String,
-        method: Method<R>,
+        method: ()->R,
         roots: List<String>? = null
     ) {
         // check roots
@@ -150,9 +152,10 @@ private class CacheAgent<R>(
             // We want fresh update()
             if(forceUpdate) {
                 job?.cancel()
+                cached = null
             } else {
                 // let's wait a job if it is active
-                if(job?.isActive == true) try { job?.join() } catch(e: Exception) {}
+                if(job?.isActive == true) try { job?.join() } catch(_: Exception) {}
             }
 
             fun updateWithRoots(): R? {
@@ -169,7 +172,7 @@ private class CacheAgent<R>(
      * The shadow updating
      */
     fun invalidate() {
-        log.info("invalidate '$name'")
+        log.debug("invalidate '$name'")
         Invalidator.schedule(this@CacheAgent)
     }
 
@@ -182,7 +185,7 @@ private class CacheAgent<R>(
         } catch(e: Exception){
             onException(name, e)
         }
-        log.info("update '$name': " + TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start) + " seconds")
+        log.debug("update '$name': " + TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start) + " seconds")
     }
 
     companion object {
@@ -229,13 +232,13 @@ private class CacheAgent<R>(
                                     // We should get data updated at the nested level before starting update data at this level
                                     // I.e. - wait previous jobs to complete
                                     levelJobs.forEach {
-                                        log.info("wait updating '${it.agent.name}' (level ${it.agent.weight})")
+                                        log.debug("wait updating '${it.agent.name}' (level ${it.agent.weight})")
                                         it.job.join()
                                     }
                                     level = agent.weight
                                     levelJobs.clear()
                                 }
-                                log.info("schedule updating '$name' (level ${agent.weight})")
+                                log.debug("schedule updating '$name' (level ${agent.weight})")
                                 job = GlobalScope.launch (agentsDispatcher) {
                                     update()
                                 }.also { levelJobs.add(CacheAgentJob(it, agent)) }
@@ -263,5 +266,5 @@ private class CacheAgent<R>(
 typealias Method<R> = ()->R
 
 /** Incorrect order of sequence of calls [LongLivedCache.register] */
-class WrongOrderException(val m: String) : RuntimeException(m)
-class MethodNotRegisteredException(val m: String) : RuntimeException(m)
+class WrongOrderException(m: String) : RuntimeException(m)
+class MethodNotRegisteredException(m: String) : RuntimeException(m)
