@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
+import java.lang.ref.SoftReference
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -127,7 +128,7 @@ private class CacheAgent<R>(
 ) {
     private val mutex = Mutex()
     private var job: Job? = null
-    private var cached: R? = null
+    private var cached: SoftReference<R>? = null
     private val log = LoggerFactory.getLogger(CacheAgent::class.java)
     private val weight by lazy { // roots level, 0 - no roots, 1 - roots without other roots, ...
     fun calculateWeight(prevWeight: Int, agent: CacheAgent<*>): Int {
@@ -143,7 +144,7 @@ private class CacheAgent<R>(
      * @return may be null if some errors during the call [updater]
      */
     fun get(forceUpdate: Boolean = false): R? = runBlocking {
-        val result = if(forceUpdate) null else cached
+        val result = if(forceUpdate) null else cached?.get()
 
         if(result != null) return@runBlocking result
 
@@ -161,10 +162,10 @@ private class CacheAgent<R>(
             fun updateWithRoots(): R? {
                 update()
                 roots?.forEach { it.invalidate() }
-                return cached
+                return cached?.get()
             }
 
-            cached ?: updateWithRoots() // update any case if we have cached==null
+            cached?.get() ?: updateWithRoots() // update any case if we have cached==null
         }
     }
 
@@ -181,7 +182,7 @@ private class CacheAgent<R>(
     private fun update() {
         val start = System.nanoTime()
         try {
-            cached = updater()
+            cached = SoftReference(updater())
         } catch(e: Exception){
             onException(name, e)
         }
