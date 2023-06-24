@@ -72,6 +72,10 @@ class LongLivedCacheTest {
         cache.invalidate(source)
         Thread.sleep(invalidatorDelay * 2) // to wait the scheduler with an extra delay
         assertEquals("2", cache.get(source))
+        cache.sourceData = "3"
+        cache.invalidate(source) {
+            assertEquals("3", cache.get(source))
+        }
     }
 
     @Test

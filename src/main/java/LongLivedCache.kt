@@ -62,11 +62,13 @@ open class LongLivedCache(
 
     /**
      * @param name should be registered with [register] before
+     * @param onFinish signaling that invalidating was finished
      */
+    @JvmOverloads
     @Throws(MethodNotRegisteredException::class)
-    fun invalidate(name: String) {
+    fun invalidate(name: String, onFinish: (() -> Unit)? = null) {
         val agent = agents[name] ?: throw MethodNotRegisteredException("Method $name not registered")
-        agent.invalidate()
+        agent.invalidate(onFinish)
     }
 
     fun invalidateAll() {
@@ -79,7 +81,7 @@ open class LongLivedCache(
     @Throws(WrongOrderException::class)
     fun <R> register(
         name: String,
-        method: ()->R,
+        method: () -> R,
         roots: List<String>? = null
     ) {
         // check roots
@@ -123,19 +125,20 @@ open class LongLivedCache(
 private class CacheAgent<R>(
     private val name: String,
     private val updater: Method<R>,
-    private val onException: (name: String, e: Throwable)->Unit,
+    private val onException: (name: String, e: Throwable) -> Unit,
     private val roots: List<CacheAgent<*>>? = null
 ) {
     private val mutex = Mutex()
     private var job: Job? = null
     private var cached: SoftReference<R>? = null
     private val log = LoggerFactory.getLogger(CacheAgent::class.java)
-    private val weight by lazy { // roots level, 0 - no roots, 1 - roots without other roots, ...
-    fun calculateWeight(prevWeight: Int, agent: CacheAgent<*>): Int {
-        return agent.roots?.let { roots->
-            roots.maxOf { root -> calculateWeight(prevWeight+1, root) }
-        } ?: prevWeight
-    }
+    private val weight by lazy {
+        // roots level, 0 - no roots, 1 - roots without other roots, ...
+        fun calculateWeight(prevWeight: Int, agent: CacheAgent<*>): Int {
+            return agent.roots?.let { roots ->
+                roots.maxOf { root -> calculateWeight(prevWeight + 1, root) }
+            } ?: prevWeight
+        }
         calculateWeight(0, this)
     }
 
@@ -144,19 +147,22 @@ private class CacheAgent<R>(
      * @return may be null if some errors during the call [updater]
      */
     fun get(forceUpdate: Boolean = false): R? = runBlocking {
-        val result = if(forceUpdate) null else cached?.get()
+        val result = if (forceUpdate) null else cached?.get()
 
-        if(result != null) return@runBlocking result
+        if (result != null) return@runBlocking result
 
         // wait the update() any case
         mutex.withLock {
             // We want fresh update()
-            if(forceUpdate) {
+            if (forceUpdate) {
                 job?.cancel()
                 cached = null
             } else {
                 // let's wait a job if it is active
-                if(job?.isActive == true) try { job?.join() } catch(_: Exception) {}
+                if (job?.isActive == true) try {
+                    job?.join()
+                } catch (_: Exception) {
+                }
             }
 
             fun updateWithRoots(): R? {
@@ -172,9 +178,9 @@ private class CacheAgent<R>(
     /**
      * The shadow updating
      */
-    fun invalidate() {
+    fun invalidate(onFinish: (() -> Unit)? = null) {
         log.debug("invalidate '$name'")
-        Invalidator.schedule(this@CacheAgent)
+        Invalidator.schedule(this@CacheAgent, onFinish)
     }
 
     // ignoring roots - just update himself
@@ -183,7 +189,7 @@ private class CacheAgent<R>(
         val start = System.nanoTime()
         try {
             cached = SoftReference(updater())
-        } catch(e: Exception){
+        } catch (e: Exception) {
             onException(name, e)
         }
         log.debug("update '$name': " + TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start) + " seconds")
@@ -194,12 +200,14 @@ private class CacheAgent<R>(
             val lock = ReentrantLock()
             val timer = Timer()
             var task: TimerTask? = null
-            val agents = HashMap<String, CacheAgent<*>>()
+            val agents = HashMap<String, AgentToInvalidate>()
 
-            fun schedule(agent: CacheAgent<*>) {
+            class AgentToInvalidate(val agent: CacheAgent<*>, val onFinish: (() -> Unit)? = null)
+
+            fun schedule(agent: CacheAgent<*>, onFinish: (() -> Unit)?) {
                 lock.lock()
-                addAgent(agent)
-                if(task == null) {
+                addAgent(agent, onFinish)
+                if (task == null) {
                     task = createTask()
                     timer.schedule(task, INVALIDATOR_DELAY)
                 }
@@ -219,30 +227,35 @@ private class CacheAgent<R>(
                 //    2     2     2
                 // We can separate levels 0, 1, 2 and run its in parallel
                 // But, if we are at level 1, we must wait for the data to update at level 2
-                val levelSortedAgents = _agents.sortedByDescending { it.weight }
-                var level = levelSortedAgents.firstOrNull()?.weight
+                val levelSortedAgents = _agents.sortedByDescending { it.agent.weight }
+                var level = levelSortedAgents.firstOrNull()?.agent?.weight
+
                 class CacheAgentJob(val job: Job, val agent: CacheAgent<*>)
+
                 val levelJobs = mutableListOf<CacheAgentJob>()
 
-                levelSortedAgents.forEach { agent->
-                    with(agent) {
-                        runBlocking {
+                levelSortedAgents.forEach {
+                    runBlocking {
+                        val agent = it.agent
+                        val onFinish = it.onFinish
+                        with(agent) {
                             mutex.withLock {
                                 job?.cancel()
-                                if(level != agent.weight) {
+                                if (level != weight) {
                                     // We should get data updated at the nested level before starting update data at this level
                                     // I.e. - wait previous jobs to complete
                                     levelJobs.forEach {
                                         log.debug("wait updating '${it.agent.name}' (level ${it.agent.weight})")
                                         it.job.join()
                                     }
-                                    level = agent.weight
+                                    level = weight
                                     levelJobs.clear()
                                 }
-                                log.debug("schedule updating '$name' (level ${agent.weight})")
-                                job = GlobalScope.launch (agentsDispatcher) {
+                                log.debug("schedule updating '$name' (level ${weight})")
+                                job = GlobalScope.launch(agentsDispatcher) {
                                     update()
-                                }.also { levelJobs.add(CacheAgentJob(it, agent)) }
+                                    onFinish?.invoke()
+                                }.also { levelJobs.add(CacheAgentJob(it, this)) }
                             }
                         }
                     }
@@ -250,8 +263,8 @@ private class CacheAgent<R>(
             }
 
             // add agent and all roots recursively
-            private fun addAgent(agent: CacheAgent<*>) {
-                agents[agent.name] = agent
+            private fun addAgent(agent: CacheAgent<*>, onFinish: (() -> Unit)? = null) {
+                agents[agent.name] = AgentToInvalidate(agent, onFinish)
                 agent.roots?.forEach {
                     addAgent(it)
                 }
@@ -264,7 +277,7 @@ private class CacheAgent<R>(
     }
 }
 
-typealias Method<R> = ()->R
+typealias Method<R> = () -> R
 
 /** Incorrect order of sequence of calls [LongLivedCache.register] */
 class WrongOrderException(m: String) : RuntimeException(m)
