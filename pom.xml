@@ -6,7 +6,7 @@
 
     <groupId>com.justprodev.longlivedcache</groupId>
     <artifactId>LongLivedCache</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <properties>
         <kotlin.version>1.4.21</kotlin.version>

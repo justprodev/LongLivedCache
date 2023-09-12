@@ -73,15 +73,16 @@ internal class CacheInvalidator(
                         // We should get data updated at the nested level before starting update data at this level
                         // I.e. - wait previous jobs to complete
                         levelJobs.forEach {
-                            logger.debug("wait updating '${it.agent.name}' (level ${it.agent.level})")
+                            logger.debug("wait update '${it.agent.name}' (level ${it.agent.level})")
                             it.job.join()
                         }
                         level = this.level
                         levelJobs.clear()
                     }
-                    logger.debug("schedule updating '$name' (level ${this.level})")
+                    logger.debug("schedule update '$name' (level ${this.level})")
                     val job = GlobalScope.launch(agentsDispatcher) {
                         update()
+                        logger.debug("updated '$name' (level ${this@with.level})")
                         onFinish?.invoke()
                     }
                     levelJobs.add(CacheAgentJob(job, this))
