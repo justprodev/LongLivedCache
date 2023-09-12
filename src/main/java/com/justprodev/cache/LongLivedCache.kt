@@ -9,6 +9,7 @@ import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
+import java.util.function.Function
 import kotlin.concurrent.timer
 import kotlin.concurrent.timerTask
 
@@ -121,7 +122,7 @@ open class LongLivedCache(
      */
     private fun <R> _register(
         name: String,
-        method: Method<R>,
+        method: () -> R,
         roots: List<CacheAgent<*>>? = null
     ): CacheAgent<R> {
         log.info("register agent '$name'")
@@ -145,7 +146,7 @@ open class LongLivedCache(
  */
 private class CacheAgent<R>(
     val name: String,
-    private val updater: Method<R>,
+    private val updater: () -> R,
     private val onException: (name: String, e: Throwable) -> Unit,
     val roots: List<CacheAgent<*>>? = null
 ) {
@@ -297,8 +298,6 @@ private class CacheAgent<R>(
         }
     }
 }
-
-typealias Method<R> = () -> R
 
 /** Incorrect order of sequence of calls [LongLivedCache.register] */
 class WrongOrderException(m: String) : RuntimeException(m)
