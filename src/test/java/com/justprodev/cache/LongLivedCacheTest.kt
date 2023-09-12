@@ -110,6 +110,23 @@ class LongLivedCacheTest {
         cache.get<String>(childSource)
 
         cache.sourceData = "2"
+        cache.invalidate(childSource)
+        assertEquals("1", cache.get(source), "cached value should be updated with the invalidator delay = $invalidatorDelay")
+        Thread.sleep(invalidatorDelay * 2) // to wait the scheduler with an extra delay
+        assertEquals("2", cache.get(source))
+    }
+
+    @Test
+    fun invalidateRootByChildWithForceGet() {
+        val cache = TestCache()
+
+        // prepare caches
+        cache.sourceData = "1"
+        cache.get<String>(source)
+        cache.childSourceData = "11"
+        cache.get<String>(childSource)
+
+        cache.sourceData = "2"
         cache.get<String>(childSource, forceUpdate = true)
         assertEquals("1", cache.get(source), "cached value should be updated with the invalidator delay = $invalidatorDelay")
         Thread.sleep(invalidatorDelay * 2) // to wait the scheduler with an extra delay
