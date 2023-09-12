@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 const val timeoutInSeconds = 10
 const val invalidatorDelay = 1000L
 const val maxThreads = 2
-val source = "source"
+const val source = "source"
 const val childSource = "child-source"
 
 class LongLivedCacheTest {
@@ -114,6 +114,26 @@ class LongLivedCacheTest {
         assertEquals("1", cache.get(source), "cached value should be updated with the invalidator delay = $invalidatorDelay")
         Thread.sleep(invalidatorDelay * 2) // to wait the scheduler with an extra delay
         assertEquals("2", cache.get(source))
+    }
+
+    @Test
+    fun isRegistered() {
+        val cache = TestCache()
+
+        assertEquals(true, cache.isRegistered(source))
+        assertEquals(true, cache.isRegistered(childSource))
+        assertEquals(false, cache.isRegistered("unknown"))
+    }
+
+    @Test
+    fun unregister() {
+        val cache = TestCache()
+
+        assertEquals(true, cache.isRegistered(source))
+        assertEquals(true, cache.isRegistered(childSource))
+        cache.unregister(childSource)
+        assertEquals(false, cache.isRegistered(source))
+        assertEquals(false, cache.isRegistered(childSource))
     }
 }
 

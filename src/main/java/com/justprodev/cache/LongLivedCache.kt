@@ -17,19 +17,20 @@ private var INVALIDATOR_DELAY = 1000L
 private var MAX_THREADS = 3
 
 /**
- * The long lived cache for a some heavily loaded but few updatable services
+ * The "long-lived" cache for a some heavily loaded but few updatable services
  *
- * Cached entities can be connected by relation child->parents.
+ * Cache entities can be connected by relation child->parents.
  * This connection guarantees that parent always be updated if child is wanted to be updated.
  *
  * All configuration should be made via [register]
  *
- * @param timeoutInSeconds in seconds, after that [invalidateAll] will be fired automatically
+ * @param invalidatorTimeoutInSeconds in seconds, after that [invalidateAll] will be fired automatically
+ * @param maxThreads maximum threads for parallel updating cache entities
  *
  * @author alex@justprodev.com
  */
 open class LongLivedCache(
-    timeoutInSeconds: Int,
+    invalidatorTimeoutInSeconds: Int,
     maxThreads: Int = 3,
     invalidatorDelay: Long = 1000L
 ) {
@@ -41,9 +42,9 @@ open class LongLivedCache(
         INVALIDATOR_DELAY = invalidatorDelay
         MAX_THREADS = maxThreads
 
-        val ttl = TimeUnit.SECONDS.toMillis(timeoutInSeconds.toLong())
+        val ttl = TimeUnit.SECONDS.toMillis(invalidatorTimeoutInSeconds.toLong())
         timer("${this.javaClass.name}_invalidate", initialDelay = ttl, period = ttl) {
-            log.debug("invalidate ${agents.size} agents by timeout ($timeoutInSeconds seconds)")
+            log.debug("invalidate ${agents.size} agents by timeout ($invalidatorTimeoutInSeconds seconds)")
             invalidateAll()
         }
         log.debug("init: threads = $MAX_THREADS, timeout = $ttl ms, invalidator_delay = $INVALIDATOR_DELAY ms")
@@ -76,7 +77,7 @@ open class LongLivedCache(
     }
 
     /**
-     *
+     * Register new cache entity with [name]
      */
     @Throws(WrongOrderException::class)
     fun <R> register(
@@ -93,7 +94,27 @@ open class LongLivedCache(
     }
 
     /**
+     * Check if cache entity [name] is registered
+     */
+    fun isRegistered(name: String) = agents.containsKey(name)
+
+    /**
+     * Unregister cache entity [name] and all related agents recursively
+     */
+    fun unregister(name: String) {
+        val agent = agents[name] ?: return
+
+        agent.roots?.forEach {
+            unregister(it.name)
+        }
+
+        log.info("unregister agent '$name'")
+        agents.remove(name)
+    }
+
+    /**
      * Create and register new [CacheAgent] with [name]
+     *
      * @param name for the new agent
      * @param roots agents to upgrade before upgrading agent
      * @return create agent
@@ -123,10 +144,10 @@ open class LongLivedCache(
  * @param roots related [CacheAgent]'s that will be updated by this agent after updating himself - it's guaranteed
  */
 private class CacheAgent<R>(
-    private val name: String,
+    val name: String,
     private val updater: Method<R>,
     private val onException: (name: String, e: Throwable) -> Unit,
-    private val roots: List<CacheAgent<*>>? = null
+    val roots: List<CacheAgent<*>>? = null
 ) {
     private val mutex = Mutex()
     private var job: Job? = null
