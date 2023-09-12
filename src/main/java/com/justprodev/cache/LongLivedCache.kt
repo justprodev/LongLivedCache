@@ -1,4 +1,4 @@
-package kz.technodom.inbody.util
+package com.justprodev.cache
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
