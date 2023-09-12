@@ -1,7 +1,7 @@
 package com.justprodev.cache
 
 import kotlinx.coroutines.*
-import org.slf4j.LoggerFactory
+import org.slf4j.Logger
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantLock
@@ -14,9 +14,9 @@ import kotlin.concurrent.timerTask
  */
 internal class CacheInvalidator(
     private val invalidatorDelay: Long,
-    maxThreads: Int
+    maxThreads: Int,
+    private val logger: Logger
 ) {
-    private val logger = LoggerFactory.getLogger(CacheInvalidator::class.java)
     private val agentsDispatcher = Executors.newFixedThreadPool(maxThreads).asCoroutineDispatcher()
     private val lock = ReentrantLock()
     private val timer = Timer()
