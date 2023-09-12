@@ -1,6 +1,7 @@
 package com.justprodev.cache
 
 import kotlinx.coroutines.*
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -16,17 +17,20 @@ import kotlin.concurrent.timer
  *
  * @param invalidatorTimeoutInSeconds in seconds, after that [invalidateAll] will be fired automatically
  * @param maxThreads maximum threads for parallel updating cache entities
+ * @param invalidatorDelay delay between [invalidate] and actual cache updating
+ * @param logger if null - will be created default logger with name of this class
  *
  * @author alex@justprodev.com
  */
 open class LongLivedCache(
     invalidatorTimeoutInSeconds: Int,
     maxThreads: Int = 3,
-    invalidatorDelay: Long = 1000L
+    invalidatorDelay: Long = 1000L,
+
 ) {
-    private val invalidator = CacheInvalidator(invalidatorDelay, maxThreads)
     private val agents = HashMap<String, CacheAgent<*>>()
-    private val logger = LoggerFactory.getLogger(this::class.java)
+    private val logger: Logger = LoggerFactory.getLogger(this::class.java)
+    private val invalidator = CacheInvalidator(invalidatorDelay, maxThreads, logger)
 
     init {
         val ttl = TimeUnit.SECONDS.toMillis(invalidatorTimeoutInSeconds.toLong())
@@ -88,7 +92,7 @@ open class LongLivedCache(
             val agent = agents[it] ?: throw WrongOrderException("'$it' should be registered before '$name'")
             agent
         }
-        _register(name, method, rootAgents)
+        register(name, method, rootAgents)
     }
 
     /**
@@ -117,7 +121,7 @@ open class LongLivedCache(
      * @param roots agents to upgrade before upgrading agent
      * @return create agent
      */
-    private fun <R> _register(
+    private fun <R> register(
         name: String,
         method: () -> R,
         roots: List<CacheAgent<*>>? = null
