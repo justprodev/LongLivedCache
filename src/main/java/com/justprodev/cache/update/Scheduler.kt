@@ -30,8 +30,9 @@ internal class Scheduler(
             scheduleAtFixedRate(period, period) {
                 val batch = getBatch()
                 if (batch.isNotEmpty()) {
-                    logger.debug("process batch of ${batch.size} updates")
+                    logger.info("start process batch of ${batch.size} updates")
                     process(batch)
+                    logger.info("end process batch of ${batch.size} updates")
                 }
             }
         }
@@ -135,5 +136,5 @@ internal class ScheduledUpdate(
         agent.name, agent.level, agent::update, onFinish
     )
 
-    override fun toString() = "ScheduledUpdate(name=$name, level=$level)"
+    override fun toString() = "name=$name, level=$level"
 }
