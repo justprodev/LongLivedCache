@@ -5,10 +5,10 @@ import java.util.*
 
 /**
  * An agent that retrieves result from [updater].
- * Result will be stored until [invalidate] isn't called
+ *
+ * @param name unique name of the agent
  * @param R result of the [updater]
  * @param updater function that produces some result that will be cached
- * @param onException delegate the handling on an exceptions, which can be thrown by [updater]
  * @param roots related [CacheAgent]'s that will be updated by this agent after updating himself - it's guaranteed
  */
 internal class CacheAgent<R>(

@@ -18,7 +18,6 @@ import kotlin.concurrent.timer
  * @param invalidatorTimeoutInSeconds in seconds, after that [invalidateAll] will be fired automatically
  * @param maxThreads maximum threads for parallel updating cache entities
  * @param invalidatorDelay delay between [invalidate] and actual cache updating
- * @param logger if null - will be created default logger with name of this class
  *
  * @author alex@justprodev.com
  */
@@ -26,7 +25,6 @@ open class LongLivedCache(
     invalidatorTimeoutInSeconds: Int,
     maxThreads: Int = 3,
     invalidatorDelay: Long = 1000L,
-
 ) {
     private val agents = HashMap<String, CacheAgent<*>>()
     private val logger: Logger = LoggerFactory.getLogger(this::class.java)
@@ -80,6 +78,11 @@ open class LongLivedCache(
 
     /**
      * Register new cache entity with [name]
+     *
+     * @param R type of content of the cache entity
+     * @param name unique name for cache entity
+     * @param method function that produces content for the cache entity
+     * @param roots related cache entities that will be updated by this entity after updating himself - it's guaranteed
      */
     @Throws(WrongOrderException::class)
     fun <R> register(
@@ -96,12 +99,16 @@ open class LongLivedCache(
     }
 
     /**
-     * Check if cache entity [name] is registered
+     * Check if cache entity [name] is register
+     *
+     * @param name unique name for cache entity
      */
     fun isRegistered(name: String) = agents.containsKey(name)
 
     /**
      * Unregister cache entity [name] and all related agents recursively
+     *
+     * @param name unique name for cache entity
      */
     fun unregister(name: String) {
         val agent = agents[name] ?: return
@@ -117,8 +124,11 @@ open class LongLivedCache(
     /**
      * Create and register new [CacheAgent] with [name]
      *
+     * @param R type of content of the cache entity
      * @param name for the new agent
+     * @param method function that produces content for the cache entity
      * @param roots agents to upgrade before upgrading agent
+     *
      * @return create agent
      */
     private fun <R> register(
