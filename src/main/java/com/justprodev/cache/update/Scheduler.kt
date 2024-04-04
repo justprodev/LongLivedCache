@@ -25,7 +25,7 @@ internal class Scheduler(
     private val waitingUpdates = HashMap<String, ScheduledUpdate>()
 
     init {
-        // start daemon timer with one periodical task to process updates every [delay] milliseconds
+        // start daemon timer with one periodical task to process updates every `period` milliseconds
         Timer(true).apply {
             scheduleAtFixedRate(period, period) {
                 val batch = getBatch()
