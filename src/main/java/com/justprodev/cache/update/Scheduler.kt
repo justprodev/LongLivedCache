@@ -52,6 +52,8 @@ internal class Scheduler(
     /**
      * Process a batch of updates
      *
+     * Function is blocking until processing of [updates] is finished
+     *
      * @param updates - batch of updates
      */
     private fun process(updates: Collection<ScheduledUpdate>) {
@@ -90,6 +92,11 @@ internal class Scheduler(
                     onFinish?.invoke()
                 }
                 levelJobs.add(UpdatingJob(job, update))
+            }
+            // wait all jobs at the last level
+            levelJobs.forEach {
+                logger.debug("wait coroutine job to update {}", it.update)
+                it.job.join()
             }
         }
     }
