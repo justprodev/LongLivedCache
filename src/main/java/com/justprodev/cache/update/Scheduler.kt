@@ -12,7 +12,7 @@ import kotlin.concurrent.scheduleAtFixedRate
  *
  * Use [add] to add a batch of scheduled updates.
  *
- * @param period - period between updating scheduled agents
+ * @param period - period between updating scheduled agents in milliseconds
  * @param maxThreads - maximum threads for parallel updating cache entities
  * @param logger - logger for debug information
  */
