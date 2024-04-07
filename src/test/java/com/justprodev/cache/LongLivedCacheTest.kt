@@ -1,12 +1,6 @@
 package com.justprodev.cache
 
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
 import kotlin.test.assertEquals
 
 const val timeoutInSeconds = 10
@@ -16,20 +10,6 @@ const val source = "source"
 const val childSource = "child-source"
 
 class LongLivedCacheTest {
-    private var logWatcher: ListAppender<ILoggingEvent>? = null
-
-    @BeforeEach
-    fun setup() {
-        logWatcher = ListAppender()
-        logWatcher!!.start()
-        (LoggerFactory.getLogger(TestCache::class.java) as Logger).addAppender(logWatcher)
-    }
-
-    @AfterEach
-    fun teardown() {
-        (LoggerFactory.getLogger(TestCache::class.java) as Logger).detachAndStopAllAppenders()
-    }
-
     @Test
     fun basic() {
         var value: String?
