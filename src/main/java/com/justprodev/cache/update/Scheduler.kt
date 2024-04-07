@@ -127,7 +127,7 @@ internal class ScheduledUpdate(
     val name: String,
     val level: Int,
     val func: () -> Unit,
-    val onFinish: (() -> Unit)?,
+    val onFinish: (() -> Unit)? = null,
 ) {
     /**
      * Create a scheduled update from the [agent]
