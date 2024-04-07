@@ -97,4 +97,16 @@ class SchedulerTest {
         assertEquals(3, counter, "All updates should be processed (${counter} processed)")
         assertNotEquals(level2ThreadName1, level2ThreadName2, "level 2 updates should be processed in parallel")
     }
+
+    @Test
+    fun errorInUpdate() {
+        var counter = 0
+        val updates = listOf(
+            ScheduledUpdate("1", 1, { counter++ }),
+            ScheduledUpdate("2", 1, { Thread.sleep(500);error("error in update 2 level") }),
+        )
+        scheduler.add(updates)
+        Thread.sleep(PERIOD * 2)
+        assertEquals(1, counter, "first level should be updated")
+    }
 }
