@@ -1,4 +1,4 @@
-name: Java Maven CI with Codecov
+name: tests
 
 on:
   push:
