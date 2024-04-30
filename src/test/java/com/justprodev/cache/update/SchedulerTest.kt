@@ -103,7 +103,12 @@ class SchedulerTest {
         var counter = 0
         val updates = listOf(
             ScheduledUpdate("1", 1, { counter++ }),
-            ScheduledUpdate("2", 1, { Thread.sleep(500);error("error in update 2 level") }),
+            ScheduledUpdate("2", 1, {
+                Thread.sleep(500)
+                error("\"this error was generated specifically" +
+                        " for the test:level 2 updates should be processed in parallel, don't panic: " +
+                        "error in update 2 level")
+            }),
         )
         scheduler.add(updates)
         Thread.sleep(PERIOD * 2)
