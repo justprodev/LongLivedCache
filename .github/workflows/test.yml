@@ -3,7 +3,7 @@ name: Java Maven CI with Codecov
 on:
   push:
     branches:
-      - main  # Change this to your desired branch
+      - master  # Change this to your desired branch
 
 jobs:
   build:
