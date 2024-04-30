@@ -1,4 +1,4 @@
-name: Java Maven CI
+name: Java Maven CI with Codecov
 
 on:
   push:
@@ -22,5 +22,11 @@ jobs:
       - name: Build with Maven
         run: mvn -B clean package --file pom.xml
 
-      - name: Test with Maven
-        run: mvn test --file pom.xml
+      - name: Test with Maven and Generate Coverage
+        run: mvn clean test jacoco:report --file pom.xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./target/site/jacoco/jacoco.xml
