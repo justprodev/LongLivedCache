@@ -106,7 +106,7 @@ class SchedulerTest {
             ScheduledUpdate("2", 1, {
                 Thread.sleep(500)
                 error("\"this error was generated specifically" +
-                        " for the test:level 2 updates should be processed in parallel, don't panic: " +
+                        " for the test, don't panic: " +
                         "error in update 2 level")
             }),
         )
