@@ -88,9 +88,13 @@ internal class Scheduler(
                 }
                 logger.debug("create coroutine job to update {}", update)
                 val job = schedulerScope.launch {
-                    update.func()
-                    logger.debug("updated {}", update)
-                    onFinish?.invoke()
+                    try {
+                        update.func()
+                        logger.debug("updated {}", update)
+                        onFinish?.invoke()
+                    } catch(e: Throwable) {
+                        logger.debug("error while updating {}", update)
+                    }
                 }
                 levelJobs.add(UpdatingJob(job, update))
             }
