@@ -93,7 +93,7 @@ internal class Scheduler(
                         logger.debug("updated {}", update)
                         onFinish?.invoke()
                     } catch(e: Throwable) {
-                        logger.debug("error while updating {}", update)
+                        logger.error("error while updating {}", update)
                     }
                 }
                 levelJobs.add(UpdatingJob(job, update))
